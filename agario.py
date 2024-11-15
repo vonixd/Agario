@@ -29,12 +29,15 @@ class Circle(object):
 
 
 class Food(object):
-    def __init__(self, x, y, radius, speed = 0):
+    def __init__(self, x, y, radius, speed = 0, dx = 0, dy = 0):
         self.x = x
         self.y = y
         self.radius = radius
         self.color = random.choice(colors)
         self.speed = speed
+        self.dx = dx
+        self.dy = dy
+
     def draw(self, win):
 
 
@@ -42,46 +45,74 @@ class Food(object):
 
     def get_pos(self):
         return self.x, self.y
+    def moving(self):
+        if self.speed > 0:
+            distance = (self.dx**2 + self.dy**2)**0.5
+            self.x += (self.dx/distance) * self.speed
+            self.y += (self.dy/distance) * self.speed
+            self.speed -= 0.4
+
+            self.x = max(0, min(w_width, self.x))
+            self.y = max(0, min(w_height, self.y))
+
+
+
 
 
 
 class Enemy(Circle):
-    def __init__(self, x, y, radius,):
+    def __init__(self, x, y,):
         self.score = 60
         self.x = x
         self.y = y
-        self.radius = radius
+        self.radius = self.score ** 0.7
         self.color = colors[1]
-        self.speed = 1
+        self.speed = 20 / (self.score / 4) + 1
 
     def draw(self, win):
         pygame.draw.circle(win, self.color, (self.x, self.y), self.radius)
     def get_pos(self):
         return self.x, self.y
     def movement(self):
+        del_x = player.x - self.x
+        del_y = player.y - self.y
+        distance = (del_x**2 + del_y**2)**0.5
+        if distance != 0:
+            if distance <= 300:
+                if player_score < self.score:
+                    self.x += (del_x/distance) * self.speed
+                    self.y += (del_y/distance) * self.speed
+                if player_score >= self.score:
 
-        if player_score < self.score:
-            if player.y > self.y and self.y >= 0 and self.y < w_height:
-                self.y += self.speed
-            if player.y < self.y and self.y >= 0 and self.y < w_height:
-                self.y -= self.speed
-            if player.x > self.x and self.x >= 0 and self.x < w_width:
-                self.x += self.speed
-            if player.x < self.x and self.x >= 0 and self.x < w_width:
-                self.x -= self.speed
-        if player_score > self.score:
-            if player.x - self.x >= player.radius  or player.y - self.y >= player.radius:
-                self.x = self.x
-                self.y = self.y
-            elif player.x - self.x <= 10  or player.y - self.y <=10 :
-                if player.y > self.y and self.y >= 0 and self.y < w_height:
-                    self.y -= self.speed
-                if player.y < self.y  and self.y >= 0 and self.y < w_height:
-                    self.y += self.speed
-                if player.x > self.x and self.x >= 0 and self.x < w_width:
-                    self.x -= self.speed
-                if player.x < self.x and self.x >= 0 and self.x < w_width:
-                    self.x += self.speed
+                    self.x -= (del_x / distance) * self.speed
+                    self.y -= (del_y / distance) * self.speed
+
+                self.x = max(0, min(w_width, self.x))
+                self.y = max(0, min(w_height, self.y))
+            else:
+                nearest_dis = 10000
+                all_list = food_list + playerw_list
+                for food in all_list:
+                    del_x = food.x - self.x
+                    del_y = food.y - self.y
+                    distance = (del_x ** 2 + del_y ** 2) ** 0.5
+                    if nearest_dis > distance:
+                        nearest = food
+                        nearest_dis = distance
+                del_x = nearest.x - self.x
+                del_y = nearest.y - self.y
+                distance = (del_x ** 2 + del_y ** 2) ** 0.5
+                self.x += (del_x/distance)*self.speed
+                self.y += (del_y/distance)*self.speed
+
+
+
+
+
+
+
+
+
 
 
 
@@ -89,21 +120,25 @@ class Enemy(Circle):
 
 def player_movement():
     pos_x, pos_y = pygame.mouse.get_pos()
-    if player.y > pos_y :
-        player.y -= player_speed
-    if player.y < pos_y:
-        player.y += player_speed
-    if player.x > pos_x:
-        player.x -= player_speed
-    if player.x < pos_x:
-        player.x += player_speed
+    del_x = pos_x-player.x
+    del_y = pos_y-player.y
+    distance = ((del_x**2) + (del_y**2))**0.5
+    if distance != 0:
+        player.x += (del_x/distance) * player_speed
+        player.y += (del_y/distance) * player_speed
+
 
 
 
 
 def writing(tekst, x, y, color = (0,0,0)):
-    text = main_font.render(tekst, 1, color)
+    text = main_font.render(tekst, True, color)
     win.blit(text, (x, y))
+
+def collision(x1, y1, r1, x2, y2, r2):
+    distance = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+    return distance < max(r1,r2)
+
 
 
 
@@ -117,6 +152,8 @@ def redrawWindow():
         i += 1
     for food in food_list:
         food.draw(win)
+    for food in playerw_list:
+        food.draw(win)
     player.draw(win)
     writing(f'score: {player_score}', w_width-len((f'score: {player_score}')*10)-50,20 )
     writing("Player" , player.x-(player.radius/2) , player.y)
@@ -127,9 +164,10 @@ def redrawWindow():
 
 food_list = []
 enemy_list = []
+playerw_list = []
 player_score = 40
-player = Circle(400, 400, 5)
-player_speed = 10
+player = Circle(400, 400, player_score ** 0.7)
+player_speed = 20 / (player_score / 4) + 1
 
 run = True
 # generate food
@@ -141,43 +179,50 @@ while run:
         if event.type == pygame.QUIT:
             run = False
     player_movement()
+    for food in playerw_list:
+        food.moving()
     # generate food
     if len(food_list) < 200:
         food_list.append(Food(random.randrange(50, 1550), random.randrange(50, 850), 10))
 
     # eat food
-    for food in food_list:
-        if food.x <= player.x + player.radius and food.x >= player.x - player.radius:
-            if food.y <= player.y + player.radius and food.y >= player.y - player.radius:
+    all_list = food_list + playerw_list
+    for food in all_list:
+        if collision(food.x,food.y,food.radius,player.x,player.y,player.radius):
+            if food in food_list:
                 food_list.remove(food)
-                player_score += 1
-                player.radius = player_score / 4
-                player_speed = 20 / (player_score / 4)
+            else:
+                playerw_list.remove(food)
+            player_score += 1
+            player.radius = player_score ** 0.7
+            player_speed = 20 / (player_score / 4) + 1
     #respawn enemy
     if len(enemy_list) < 3:
-        enemy_list.append(Enemy(random.randrange(50,1550), random.randrange(50, 850), 10))
+        enemy_list.append(Enemy(random.randrange(50,1550), random.randrange(50, 850)))
 
     #collision enemy
     for enemy in enemy_list:
         enemy.movement()
-        if enemy.x <= player.x + player.radius and enemy.x >= player.x - player.radius:
-            if enemy.y <= player.y + player.radius and enemy.y >= player.y - player.radius:
-                if player_score > enemy.score:
-                    enemy_list.remove(enemy)
-                    player_score += enemy.score
-                    player.radius = player_score / 4
-                    player_speed = 20 / (player_score / 4)
-                if player_score < enemy.score:
-                    run = False
+        if collision(player.x,player.y,player.radius,enemy.x,enemy.y,enemy.radius):
+            if player_score > enemy.score:
+                enemy_list.remove(enemy)
+                player_score += enemy.score
+                player.radius = player_score ** 0.7
+                player_speed = 20 / (player_score / 4) +1
+            if player_score < enemy.score:
+                run = False
         #enemy eat food
         for enemy in enemy_list:
-            for food in food_list:
-                if food.x <= enemy.x + enemy.radius and food.x >= enemy.x - enemy.radius:
-                    if food.y <= enemy.y + enemy.radius and food.y >= enemy.y - enemy.radius:
+            all_list = food_list + playerw_list
+            for food in all_list:
+                if collision(food.x,food.y,food.radius,enemy.x,enemy.y,enemy.radius):
+                    if food in food_list:
                         food_list.remove(food)
-                        enemy.score += 1
-                        enemy.radius = enemy.score / 4
-                        enemy.speed = 20 / (enemy.score / 2)
+                    else:
+                        playerw_list.remove(food)
+                    enemy.score += 1
+                    enemy.radius = enemy.score ** 0.7
+                    enemy.speed = 20 / (enemy.score / 4) + 1
 
 
 
@@ -186,15 +231,20 @@ while run:
 
     keys = pygame.key.get_pressed()
 
+
     if keys[pygame.K_w]:
         if player_score >= 20:
-            food_list.append(Food(pos_x, pos_y, 10))
+            del_x = pos_x - player.x
+            del_y = pos_y - player.y
+            distance = ((del_x ** 2) + (del_y ** 2)) ** 0.5
+            playerw_list.append(Food(player.x + (del_x/distance)*player.radius*1.2 , player.y + (del_y/distance)*player.radius*1.2, 10, 12, del_x, del_y))
             player_score -= 1
-            player.radius = player_score / 4
-            player_speed = 20 / (player_score / 4)
-    if keys[pygame.K_t]:
-        player.x = pos_x
-        player.y = pos_y
+            player.radius = player_score ** 0.7
+            player_speed = 20 / (player_score / 4) + 1
+    if keys[pygame.K_SPACE] and player_score >=20:
+        player_speed = 20
+        player_score -= round(player_score/100)
+
     redrawWindow()
 
 pygame.quit()
